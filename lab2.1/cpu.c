@@ -1,4 +1,6 @@
 
+#include <sys/queue.h>
+#include <stdio.h>
 
 /****************************************************************************/
 /*                                                                          */
@@ -22,6 +24,7 @@ typedef enum {
     running, ready, waiting, done       /* types of status                  */
 } STATUS;
 
+CIRCLEQ_HEAD(pcb_head, pcb_node_wrapper) head;
 
 
 /* external type definitions */
@@ -30,6 +33,7 @@ typedef struct page_entry_node PAGE_ENTRY;
 typedef struct page_tbl_node PAGE_TBL;
 typedef struct event_node EVENT;
 typedef struct pcb_node PCB;
+typedef struct pcb_node_wrapper WRAPPER;
 
 
 
@@ -46,6 +50,11 @@ struct page_tbl_node {
     PCB    *pcb;        /* PCB of the process in question                   */
     PAGE_ENTRY page_entry[MAX_PAGE];
     int    *hook;       /* can hook up anything here                        */
+};
+
+struct pcb_node_wrapper {
+    PCB*	node;
+    CIRCLEQ_ENTRY(PCB) pcb_links;
 };
 
 struct pcb_node {
@@ -104,6 +113,7 @@ extern int get_clock();
 
 void cpu_init()
 {
+  CIRCLEQ_INIT(&head);
 
 }
 
@@ -114,12 +124,31 @@ void dispatch()
 
 }
 
-
-
 void insert_ready(pcb)
 PCB *pcb;
 {
+  WRAPPER* i;
+  CIRCLEQ_FOREACH(i,&head,pcb_links)
+  {
+    if( i->node->pcb_id == pcb->pcb_id )
+      return;
+  }
 
+  WRAPPER* new_pcb = malloc( sizeof(WRAPPER) );
+  new_pcb->node = pcb;
+  CIRCLEQ_INSERT_TAIL(&head, new_pcb, pcb_links);
+  pcb->status = ready;
+
+  fprintf(stderr,"Head Node:\nself:%p\tfirst:%p\tlast:%p\n",
+		  &head, head.cqh_first, head.cqh_last);
+  fprintf(stderr,"Processes in the ready queue:\n");
+
+  WRAPPER* p;
+  CIRCLEQ_FOREACH_REVERSE(p,&head,pcb_links)
+  {
+	  fprintf(stderr,"Pid:%d\tself:%p\tprev:%p\tnext:%p\n",
+			  p->node->pcb_id, p, p->pcb_links.cqe_prev, p->pcb_links.cqe_next);
+  }
 }
 
 /* end of module */
