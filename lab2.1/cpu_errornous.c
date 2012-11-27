@@ -126,8 +126,25 @@ PCB* pop()
     return NULL;
 
   WRAPPER* p = CIRCLEQ_FIRST( head );
+  //
+  //CIRCLEQ_REMOVE( &h, p, pcb_links );
+	if (CIRCLEQ_NEXT((p), pcb_links) == (void *)(head))	
+		CIRCLEQ_LAST((head)) = CIRCLEQ_PREV((p), pcb_links);	
+	else
+	{ 
+		//PCB* t;
+		//t = p->pcb_links.cqe_next;
+		(((p->pcb_links).cqe_next)->pcb_links).cqe_prev =	(p->pcb_links).cqe_prev;
+		//WRAPPER* t1 = p->pcb_links.cqe_next;
+    //WRAPPER* t2 = t1->pcb_links.cqe_prev;
+    //WRAPPER* t3 =	p->pcb_links.cqe_prev;
+	}
+	if (CIRCLEQ_PREV((p), pcb_links) == (void *)(head))		
+		CIRCLEQ_FIRST((head)) = CIRCLEQ_NEXT((p), pcb_links);	
+	else								
+		CIRCLEQ_NEXT(CIRCLEQ_PREV((p), pcb_links), pcb_links) =	
+		    CIRCLEQ_NEXT((p), field);				
 
-  CIRCLEQ_REMOVE( head, p, pcb_links );
 
   return p->node;
 }
@@ -136,7 +153,7 @@ void dispatch()
 {
   PCB* current_pcb = PTBR->pcb;
   if( current_pcb != NULL &&
-      current_pcb.status == running )
+      current_pcb->status == running )
   {
     insert_ready(current_pcb);
   }
@@ -146,7 +163,7 @@ void dispatch()
 
   if( current_pcb != NULL )
   {
-    PTBR = current_pcb.page_tbl;
+    PTBR = current_pcb->page_tbl;
     current_pcb->status = running;
     current_pcb->last_dispatch = get_clock();
     set_timer(Quantum);
