@@ -24,7 +24,6 @@ typedef enum {
     running, ready, waiting, done       /* types of status                  */
 } STATUS;
 
-CIRCLEQ_HEAD(pcb_head, pcb_node_wrapper) head;
 
 
 /* external type definitions */
@@ -34,7 +33,7 @@ typedef struct page_tbl_node PAGE_TBL;
 typedef struct event_node EVENT;
 typedef struct pcb_node PCB;
 typedef struct pcb_node_wrapper WRAPPER;
-
+typedef struct pcb_head HEAD;
 
 
 /* external data structures */
@@ -107,28 +106,62 @@ extern int get_clock();
 /*                                                                          */
 /****************************************************************************/
 
+CIRCLEQ_HEAD(pcb_head, pcb_node_wrapper);
+HEAD *head;
 
 
 
 
 void cpu_init()
 {
-  CIRCLEQ_INIT(&head);
-
+  CIRCLEQ_INIT(head);
+  head = (HEAD*) malloc(sizeof(HEAD));
+  head->cqh_first = NULL;
+  head->cqh_last = NULL;
 }
 
+PCB* pop()
+{
+  if( CIRCLEQ_EMPTY(head) )
+    return NULL;
 
+  WRAPPER* p = CIRCLEQ_FIRST( head );
+
+  CIRCLEQ_REMOVE( head, p, pcb_links );
+
+  return p->node;
+}
 
 void dispatch()
 {
+  PCB* current_pcb = PTBR->pcb;
+  if( current_pcb != NULL &&
+      current_pcb.status == running )
+  {
+    insert_ready(current_pcb);
+  }
 
+  current_pcb = pop();
+
+
+  if( current_pcb != NULL )
+  {
+    PTBR = current_pcb.page_tbl;
+    current_pcb->status = running;
+    current_pcb->last_dispatch = get_clock();
+    set_timer(Quantum);
+  }
+  else
+  {
+    PTBR = NULL;
+  }
 }
 
 void insert_ready(pcb)
 PCB *pcb;
 {
   WRAPPER* i;
-  CIRCLEQ_FOREACH(i,&head,pcb_links)
+  CIRCLEQ_FOREACH(i,head,pcb_links)
   {
     if( i->node->pcb_id == pcb->pcb_id )
       return;
@@ -136,15 +169,15 @@ PCB *pcb;
 
   WRAPPER* new_pcb = malloc( sizeof(WRAPPER) );
   new_pcb->node = pcb;
-  CIRCLEQ_INSERT_TAIL(&head, new_pcb, pcb_links);
+  CIRCLEQ_INSERT_TAIL(head, new_pcb, pcb_links);
   pcb->status = ready;
 
   fprintf(stderr,"Head Node:\nself:%p\tfirst:%p\tlast:%p\n",
-		  &head, head.cqh_first, head.cqh_last);
+		  head, head->cqh_first, head->cqh_last);
   fprintf(stderr,"Processes in the ready queue:\n");
 
   WRAPPER* p;
-  CIRCLEQ_FOREACH_REVERSE(p,&head,pcb_links)
+  CIRCLEQ_FOREACH_REVERSE(p,head,pcb_links)
   {
 	  fprintf(stderr,"Pid:%d\tself:%p\tprev:%p\tnext:%p\n",
 			  p->node->pcb_id, p, p->pcb_links.cqe_prev, p->pcb_links.cqe_next);
