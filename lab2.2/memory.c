@@ -1,7 +1,7 @@
 /****************************************************************************/
 /*                                                                          */
-/* 			     Module MEMORY                                  */
-/* 			External Declarations 	                            */
+/*           Module MEMORY                                  */
+/*      External Declarations                               */
 /*                                                                          */
 /****************************************************************************/
 
@@ -115,7 +115,7 @@ struct iorb_node {
 struct int_vector_node {
     INT_TYPE cause;           /* cause of interrupt                         */
     PCB    *pcb;              /* PCB to be started (if startsvc) or pcb that*/
-			      /* caused page fault (if fagefault interrupt) */
+            /* caused page fault (if fagefault interrupt) */
     int    page_id;           /* page causing pagefault                     */
     int    dev_id;            /* device causing devint                      */
     EVENT  *event;            /* event involved in waitsvc and sigsvc calls */
@@ -126,10 +126,10 @@ struct int_vector_node {
 
 /* extern variables */
 
-extern INT_VECTOR Int_Vector;           /* interrupt vector         	     */
-extern PAGE_TBL *PTBR;                  /* page table base register 	     */
-extern FRAME Frame_Tbl[MAX_FRAME];      /* frame table              	     */
-extern int Prepage_Degree;		/* global degree of prepaging (0-10) */
+extern INT_VECTOR Int_Vector;           /* interrupt vector                */
+extern PAGE_TBL *PTBR;                  /* page table base register        */
+extern FRAME Frame_Tbl[MAX_FRAME];      /* frame table                     */
+extern int Prepage_Degree;    /* global degree of prepaging (0-10) */
 
 
 
@@ -145,8 +145,8 @@ extern gen_int_handler();
 
 /****************************************************************************/
 /*                                                                          */
-/* 			     Module MEMORY                                  */
-/* 			Internal Declarations 	                            */
+/*           Module MEMORY                                  */
+/*      Internal Declarations                               */
 /*                                                                          */
 /****************************************************************************/
 
@@ -154,21 +154,21 @@ extern gen_int_handler();
 #define   PUBLIC
 #define   TRUE            1
 #define   FALSE           0
-//#define   NULL            0	     /*  NULL pointer   */
+//#define   NULL            0      /*  NULL pointer   */
 #define   UNLOCKED        0
 #define   MAX_SIZE      MAX_PAGE*PAGE_SIZE /* max size of a job allowed     */
 
 
-#define get_page_tbl(pcb)		pcb->page_tbl
+#define get_page_tbl(pcb)   pcb->page_tbl
 
-#define lock_frame(frame_id)		Frame_Tbl[frame_id].lock_count++
-#define unlock_frame(frame_id)		Frame_Tbl[frame_id].lock_count--
-#define set_frame_dirty(frame_id)	Frame_Tbl[frame_id].dirty = true
+#define lock_frame(frame_id)    Frame_Tbl[frame_id].lock_count++
+#define unlock_frame(frame_id)    Frame_Tbl[frame_id].lock_count--
+#define set_frame_dirty(frame_id) Frame_Tbl[frame_id].dirty = true
 
 
 /* external variables */
 
-static int trace = FALSE;	/* Internal trace flag */
+static int trace = FALSE; /* Internal trace flag */
 static int clock_hand = 0;
 
 
@@ -191,13 +191,13 @@ PRIVATE void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id);
 PRIVATE void page_demon();
 
 /**************************************************************************/
-/*									  */
-/*			memory_init()					  */
-/*									  */
+/*                    */
+/*      memory_init()           */
+/*                    */
 /*   Description  : initialize the data structure in memory module        */
-/*									  */
-/*   called by    : SIMCORE module					  */
-/*									  */
+/*                    */
+/*   called by    : SIMCORE module            */
+/*                    */
 /**************************************************************************/
 PUBLIC
 memory_init()
@@ -207,14 +207,14 @@ memory_init()
 
 
 /**************************************************************************/
-/*									  */
-/*			get_page					  */
-/*									  */
-/*	Description : To  transfer a page from drum to main memory        */
-/*     									  */
-/*      Called by   : PAGEINT module					  */
-/*									  */
-/*									  */
+/*                    */
+/*      get_page            */
+/*                    */
+/*  Description : To  transfer a page from drum to main memory        */
+/*                        */
+/*      Called by   : PAGEINT module            */
+/*                    */
+/*                    */
 /**************************************************************************/
 PUBLIC
 get_page(pcb,page_id)
@@ -229,6 +229,7 @@ int    page_id;
       --free_frames;
       p = p->next;
     } while (p != current);
+    fprintf(stderr,"freefream %d\n",free_frames);
   }
   
   if (free_frames < MIN_FREE) {
@@ -265,6 +266,7 @@ void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id) {
 
 PRIVATE
 void page_demon() {
+fprintf(stderr,"PaGE d\n");
   // Do nothing with an empty list.
   if (current == NULL) {
     return;
@@ -279,18 +281,21 @@ void page_demon() {
     
     if (page->ref) {
       page->ref = false;
+      current = current->next;
     } else {
       FRAME *frame = &(Frame_Tbl[page->frame_id]);
       if (frame->lock_count == 0) {
         // Copy frame to memory.
+fprintf(stderr,"Before:%p\n", frame);
         if (frame->dirty) {
           siodrum(write, frame->pcb, frame->page_id, 0);
           frame->dirty = false;
         }
+fprintf(stderr,"After:%p\n", frame);
         
         // Make frame free for other processes.
         page->valid = false;
-        frame->free = false;
+        frame->free = true;
         frame->pcb = NULL;
         frame->page_id = -1;
         
@@ -301,6 +306,7 @@ void page_demon() {
     
     p = p->next;
   }
+  print_page_tbl();
 }
 
 PRIVATE
@@ -328,6 +334,7 @@ void list_insert(PAGE_ENTRY *page) {
   }
 }
 
+
 PRIVATE
 void list_remove() {
   if (current == NULL) {
@@ -343,75 +350,119 @@ void list_remove() {
     ahead->prev = behind;
     free(current);
     
-    current = behind;
+    current = ahead;
   }
 }
 
 /**************************************************************************/
-/*									  */
-/*                  deallocate						  */
-/*									  */
+/*                    */
+/*                  deallocate              */
+/*                    */
 /*   Description : The job is history now so free the memory frames       */
-/*                 occupied by the process.		                  */
+/*                 occupied by the process.                     */
 /*                 Set the pcb to NULL                                    */
-/*  								          */
+/*                            */
 /*   called by   : PROCSVC module                                         */
-/*									  */
+/*                    */
 /**************************************************************************/
 PUBLIC
 deallocate(pcb)
 PCB *pcb;
 {
+  if( current == NULL ){
+    return;
+  }
 
+  int i;
+  for( i=0; i < MAX_PAGE; ++i )
+  {
+    PAGE_ENTRY* page = &(pcb->page_tbl->page_entry[i]);
+    if( !page->valid ){
+      continue;
+    }
+    page->valid = false;
+    page->ref = false;
+
+    FRAME *frame = &(Frame_Tbl[page->frame_id]);
+    frame->free = true;
+    frame->pcb = NULL;
+    frame->page_id = -1;
+    frame->dirty = false;
+
+    // Removing page form the list
+    LIST_ITEM* p = current;
+    if (current->next == current) {
+      free(current);
+      current = NULL;
+      return;
+    } else {
+      do {
+        if (p->page == page) {
+          LIST_ITEM *ahead = p->next;
+          LIST_ITEM *behind = p->prev;
+
+          behind->next = ahead;
+          ahead->prev = behind;
+          free(p);
+
+          if (p == current) {
+            current = ahead;
+          }
+        }
+        p = p->next;
+      } while ( p != current );
+
+    }
+  }
 }
   
 
 /************************************************************************/
-/*									*/
-/*		   prepage						*/
-/*									*/
+/*                  */
+/*       prepage            */
+/*                  */
 /*    Description : Swap the process specified in the argument from     */
 /*                  drum/disk to main memory.                           */
-/*	            Will  use the prepaging policy.                     */
-/*   									*/
-/*   called by    : CPU module						*/
-/*									*/
+/*              Will  use the prepaging policy.                     */
+/*                    */
+/*   called by    : CPU module            */
+/*                  */
 /************************************************************************/
 PUBLIC
 prepage(pcb)
 PCB *pcb;
 {
-	/* Not part of lab. Leave empty  */
+  /* Not part of lab. Leave empty  */
 }   
-					 
+           
 /************************************************************************/
-/*									*/
-/*		   start_cost						*/
-/*									*/
-/*   called by    : CPU module						*/
-/*									*/
+/*                  */
+/*       start_cost           */
+/*                  */
+/*   called by    : CPU module            */
+/*                  */
 /************************************************************************/
 PUBLIC
 int start_cost(pcb)
 PCB *pcb;
 {
-	/* Not part of lab. Leave empty  */
+  /* Not part of lab. Leave empty  */
 }   
 
  
 /***************************************************************************/
-/*									   */
-/*   			refer					           */
-/*									   */
-/*	Description : Called by SIMCORE module to simulate memory          */
-/*		      referencing by processes.                            */
-/*									   */
-/*      Called by   : SIMCORE module					   */
-/*									   */
-/*	Call        : gen_int_handler()				           */
-/*									  */
+/*                     */
+/*        refer                    */
+/*                     */
+/*  Description : Called by SIMCORE module to simulate memory          */
+/*          referencing by processes.                            */
+/*                     */
+/*      Called by   : SIMCORE module             */
+/*                     */
+/*  Call        : gen_int_handler()                  */
+/*                    */
 /*   You are not expected to change this routine                            */
-/*									   */
+/*                     */
 /***************************************************************************/
 PUBLIC
 refer(logic_addr,action)
@@ -431,11 +482,11 @@ REFER_ACTION action;       /* a store operation will change memory content */
 
   if (trace)
     printf("Hello refer(pcb: %d,logic_addr: %d,action: %d)\n",
-					pcb->pcb_id,logic_addr,action);
+          pcb->pcb_id,logic_addr,action);
   
 
   job_size = pcb->size;
-  page_tbl_ptr = get_page_tbl(pcb);	/* macro */
+  page_tbl_ptr = get_page_tbl(pcb); /* macro */
 
   if (logic_addr < MAX_SIZE && logic_addr < job_size && logic_addr >= 0){
 
@@ -458,14 +509,14 @@ REFER_ACTION action;       /* a store operation will change memory content */
                  (action == store)) {
 
          frame_id = page_tbl_ptr->page_entry[page_no].frame_id;
-         set_frame_dirty(frame_id);	/* macro */
+         set_frame_dirty(frame_id); /* macro */
 
        }
 
   }
   else {
     printf("CLOCK> %6d#*** ERROR: MEMORY.refer>\n\t\tPCB %d: Invalid address passed to refer(%d, ...)\n\n\n",
-				get_clock(),pcb->pcb_id,logic_addr);
+        get_clock(),pcb->pcb_id,logic_addr);
     print_sim_frame_tbl();
     osp_abort();
   }
@@ -474,19 +525,19 @@ REFER_ACTION action;       /* a store operation will change memory content */
 
 
 /*************************************************************************/
-/*									 */
-/*			lock_page					 */
-/*									 */
-/*	Description:   To lock the chunk of memory mentioned in iorb     */
-/*		       to protect it from being swapped out.             */
-/*									 */
-/*	Called by  :   DEVICES module					 */
+/*                   */
+/*      lock_page          */
+/*                   */
+/*  Description:   To lock the chunk of memory mentioned in iorb     */
+/*           to protect it from being swapped out.             */
+/*                   */
+/*  Called by  :   DEVICES module          */
 /*                                                                       */
 /*      call       :   gen_int_handler in INTER module                   */
 /*                     lock_frame                                        */
-/*									  */
+/*                    */
 /*   You are not expected to change this routine                            */
-/*									 */
+/*                   */
 /*************************************************************************/
 PUBLIC
 lock_page(iorb)
@@ -501,7 +552,7 @@ IORB *iorb;
 
     check_iorb(iorb,1,"MEMORY.lock_page","","upon entering routine");
 
-    page_tbl_ptr = get_page_tbl(iorb->pcb);	/* macro */
+    page_tbl_ptr = get_page_tbl(iorb->pcb); /* macro */
     page_id      =  iorb->page_id;
 
     if (page_tbl_ptr->page_entry[page_id].valid == false) {
@@ -516,8 +567,8 @@ IORB *iorb;
 
 
     if (iorb->action == read)
-        set_frame_dirty(frame_id);	/* macro */
-    lock_frame(frame_id);	/* macro */
+        set_frame_dirty(frame_id);  /* macro */
+    lock_frame(frame_id); /* macro */
  } 
 
 
@@ -530,7 +581,7 @@ IORB *iorb;
 /*          Called by   : DEVICES module                                 */
 /*                                                                       */
 /*          Call        : unlock_frame                                   */
-/*									  */
+/*                    */
 /*   You are not expected to change this routine                            */
 /*                                                                       */
 /*************************************************************************/
@@ -547,22 +598,22 @@ IORB *iorb;
 
    check_iorb(iorb,1,"MEMORY.unlock_page","","upon entering routine");
 
-   page_tbl_ptr = get_page_tbl(iorb->pcb);	/* macro */
+   page_tbl_ptr = get_page_tbl(iorb->pcb);  /* macro */
    page_id      = iorb->page_id;
    frame_id = page_tbl_ptr->page_entry[page_id].frame_id;
 
 
-   unlock_frame(frame_id);	/* macro */
+   unlock_frame(frame_id);  /* macro */
 
 } 
 
 /****************************************************************************/
-/*									    */
-/*			print_page_tbl					    */
-/*									    */
-/* 	Description : Print the page table of a process.		    */
+/*                      */
+/*      print_page_tbl              */
+/*                      */
+/*  Description : Print the page table of a process.        */
 /*                    For debugging purpose                                 */
-/*									    */
+/*                      */
 /****************************************************************************/
 
 
@@ -580,3 +631,4 @@ PAGE_TBL   *page_tbl_ptr;
 
   printf("\n\n");
 }
+
