@@ -171,6 +171,25 @@ extern gen_int_handler();
 static int trace = FALSE;	/* Internal trace flag */
 static int clock_hand = 0;
 
+
+
+#define MIN_FREE 4
+#define LOTS_FREE 1
+
+typedef struct list_item_struct LIST_ITEM;
+struct list_item_struct {
+  PAGE_ENTRY *page;
+  LIST_ITEM *next;
+  LIST_ITEM *prev;
+};
+
+LIST_ITEM *current;
+
+PRIVATE void list_insert(PAGE_ENTRY*);
+PRIVATE void list_remove();
+PRIVATE void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id);
+PRIVATE void page_demon();
+
 /**************************************************************************/
 /*									  */
 /*			memory_init()					  */
@@ -183,7 +202,7 @@ static int clock_hand = 0;
 PUBLIC
 memory_init()
 {
-
+  current = NULL;
 }
 
 
@@ -203,9 +222,130 @@ PCB   *pcb;
 int    page_id;
 
 {
-
+  int free_frames = MAX_FRAME;
+  if (current != NULL) {
+    LIST_ITEM *p = current;
+    do {
+      --free_frames;
+      p = p->next;
+    } while (p != current);
+  }
+  
+  if (free_frames < MIN_FREE) {
+    page_demon();
+  }
+  
+  PAGE_ENTRY *page = &(pcb->page_tbl->page_entry[page_id]);
+  list_insert(page);
+  
+  put_into_frame(pcb, page, page_id);
 }
 
+PRIVATE
+void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id) {
+  int free_frame = -1;
+  int i = 0;
+  
+  for (i = 0; i < MAX_FRAME; ++i) {
+    FRAME *frame = &(Frame_Tbl[i]);
+    if (frame->free) {
+      free_frame = i;
+      frame->free = false;
+      frame->pcb = pcb;
+      frame->page_id = page_id;
+      break;
+    }
+  }
+  
+  siodrum(read, pcb, page_id, free_frame);
+  page->frame_id = free_frame;
+  page->valid = true;
+  page->ref = true;
+}
+
+PRIVATE
+void page_demon() {
+  // Do nothing with an empty list.
+  if (current == NULL) {
+    return;
+  }
+  
+  int i = LOTS_FREE;
+  int removed = 0;
+  
+  LIST_ITEM *p = current;
+  while (removed < LOTS_FREE) {
+    PAGE_ENTRY *page = p->page;
+    
+    if (page->ref) {
+      page->ref = false;
+    } else {
+      FRAME *frame = &(Frame_Tbl[page->frame_id]);
+      if (frame->lock_count == 0) {
+        // Copy frame to memory.
+        if (frame->dirty) {
+          siodrum(write, frame->pcb, frame->page_id, 0);
+          frame->dirty = false;
+        }
+        
+        // Make frame free for other processes.
+        page->valid = false;
+        frame->free = false;
+        frame->pcb = NULL;
+        frame->page_id = -1;
+        
+        ++removed;
+        list_remove();
+      }
+    }
+    
+    p = p->next;
+  }
+}
+
+PRIVATE
+void list_insert(PAGE_ENTRY *page) {
+  LIST_ITEM *item = (LIST_ITEM*) malloc(sizeof(LIST_ITEM));
+  item->page = page;
+  item->next = NULL;
+  item->prev = NULL;
+  
+  if (current == NULL) {
+    item->next = item;
+    item->prev = item;
+    current = item;
+  } else {
+    LIST_ITEM *ahead = current->next;
+    LIST_ITEM *behind = current;
+    
+    item->next = ahead;
+    item->prev = behind;
+    
+    ahead->prev = item;
+    behind->next = item;
+    
+    current = item;
+  }
+}
+
+PRIVATE
+void list_remove() {
+  if (current == NULL) {
+    return;
+  } else if (current->next == current) {
+    free(current);
+    current = NULL;
+  } else {
+    LIST_ITEM *ahead = current->next;
+    LIST_ITEM *behind = current->prev;
+    
+    behind->next = ahead;
+    ahead->prev = behind;
+    free(current);
+    
+    current = behind;
+  }
+}
 
 /**************************************************************************/
 /*									  */

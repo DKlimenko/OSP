@@ -101,7 +101,7 @@ void pagefault_handler(pcb, page_id)
 PCB *pcb;
 int page_id;
 {
-
+  get_page(pcb, page_id);
 }
 
 /* end of module */
