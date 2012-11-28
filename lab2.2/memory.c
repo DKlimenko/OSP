@@ -222,6 +222,15 @@ PCB   *pcb;
 int    page_id;
 
 {
+  // If some locks have now been released, free the frames.
+  int i = 0;
+  for (i = 0; i < MAX_FRAME; ++i) {
+    FRAME *frame = &(Frame_Tbl[i]);
+    if (frame->pcb == NULL && frame->lock_count == 0) {
+      frame->free = true;
+    }
+  }
+  
   int free_frames = MAX_FRAME;
   if (current != NULL) {
     LIST_ITEM *p = current;
@@ -229,7 +238,6 @@ int    page_id;
       --free_frames;
       p = p->next;
     } while (p != current);
-    fprintf(stderr,"freefream %d\n",free_frames);
   }
   
   if (free_frames < MIN_FREE) {
@@ -266,7 +274,6 @@ void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id) {
 
 PRIVATE
 void page_demon() {
-fprintf(stderr,"PaGE d\n");
   // Do nothing with an empty list.
   if (current == NULL) {
     return;
@@ -286,12 +293,10 @@ fprintf(stderr,"PaGE d\n");
       FRAME *frame = &(Frame_Tbl[page->frame_id]);
       if (frame->lock_count == 0) {
         // Copy frame to memory.
-fprintf(stderr,"Before:%p\n", frame);
         if (frame->dirty) {
-          siodrum(write, frame->pcb, frame->page_id, 0);
+          siodrum(write, frame->pcb, frame->page_id, page->frame_id);
           frame->dirty = false;
         }
-fprintf(stderr,"After:%p\n", frame);
         
         // Make frame free for other processes.
         page->valid = false;
@@ -306,7 +311,6 @@ fprintf(stderr,"After:%p\n", frame);
     
     p = p->next;
   }
-  print_page_tbl();
 }
 
 PRIVATE
@@ -384,10 +388,16 @@ PCB *pcb;
     page->ref = false;
 
     FRAME *frame = &(Frame_Tbl[page->frame_id]);
-    frame->free = true;
+    
     frame->pcb = NULL;
     frame->page_id = -1;
     frame->dirty = false;
+    
+    if (frame->lock_count > 0) {
+      continue;
+    }
+    
+    frame->free = true;
 
     // Removing page form the list
     LIST_ITEM* p = current;
