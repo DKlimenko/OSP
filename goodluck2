@@ -1,0 +1,25 @@
+#!/bin/csh
+# Ulf Lindqvist 1999-01-25, A Dahlberg 2009-12-22
+
+if ( ! -d lab2.2 ) then
+   /bin/mkdir lab2.2
+   /bin/cp /chalmers/groups/cab_ce_edu_2010_eda092_os_-/OSP/lab2.2.linux/Makefile lab2.2/
+   /bin/cp /chalmers/groups/cab_ce_edu_2010_eda092_os_-/OSP/lab2.2.linux/memory.c lab2.2/
+   /bin/cp /chalmers/groups/cab_ce_edu_2010_eda092_os_-/OSP/lab2.2.linux/pageint.c lab2.2/
+   /bin/cp /chalmers/groups/cab_ce_edu_2010_eda092_os_-/OSP/lab2.2.linux/dialog.c lab2.2/
+   /bin/cp /chalmers/groups/cab_ce_edu_2010_eda092_os_-/OSP/lab2.2.linux/par.debug lab2.2/
+else
+   echo "====================================="
+   echo "Directory lab2.2 already exists."
+   echo "Rename it or remove it and try again."
+   echo "====================================="
+   exit 1
+endif
+
+echo "====================================="
+echo "Setup is finished.                   "
+echo "Now start with the command:"
+echo "cd lab2.2"
+echo "====================================="
+
+exit 0
