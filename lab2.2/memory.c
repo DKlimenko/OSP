@@ -173,7 +173,7 @@ static int clock_hand = 0;
 
 
 
-#define MIN_FREE 4
+#define MIN_FREE 1
 #define LOTS_FREE 1
 
 typedef struct list_item_struct LIST_ITEM;
@@ -231,13 +231,12 @@ int    page_id;
     }
   }
   
-  int free_frames = MAX_FRAME;
-  if (current != NULL) {
-    LIST_ITEM *p = current;
-    do {
-      --free_frames;
-      p = p->next;
-    } while (p != current);
+  int free_frames = 0;
+  for (i = 0; i < MAX_FRAME; ++i) {
+    FRAME *frame = &(Frame_Tbl[i]);
+    if (frame->free && frame->lock_count == 0) {
+      ++free_frames;
+    }
   }
   
   if (free_frames < MIN_FREE) {
