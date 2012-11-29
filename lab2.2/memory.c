@@ -282,7 +282,6 @@ void page_demon() {
     return;
   }
   
-  int i = LOTS_FREE;
   int removed = 0;
   
   LIST_ITEM *p = current;
