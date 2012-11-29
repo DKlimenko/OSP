@@ -308,7 +308,10 @@ void page_demon() {
         frame->page_id = -1;
         
         ++removed;
-        list_remove();
+        list_remove(); // current is updated here
+      } else {
+        // If we don't do list_remove(), we need to update current manually
+        current = current->next;
       }
     }
     
