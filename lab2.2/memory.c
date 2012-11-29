@@ -257,16 +257,19 @@ void put_into_frame(PCB *pcb, PAGE_ENTRY *page, int page_id) {
   
   for (i = 0; i < MAX_FRAME; ++i) {
     FRAME *frame = &(Frame_Tbl[i]);
-    if (frame->free) {
+    if (frame->free && frame->lock_count == 0) {
       free_frame = i;
-      frame->free = false;
-      frame->pcb = pcb;
-      frame->page_id = page_id;
       break;
     }
   }
   
   siodrum(read, pcb, page_id, free_frame);
+  
+  FRAME *frame = &(Frame_Tbl[free_frame]);
+  frame->free = false;
+  frame->pcb = pcb;
+  frame->page_id = page_id;
+  
   page->frame_id = free_frame;
   page->valid = true;
   page->ref = true;
@@ -393,11 +396,9 @@ PCB *pcb;
     frame->page_id = -1;
     frame->dirty = false;
     
-    if (frame->lock_count > 0) {
-      continue;
+    if (frame->lock_count == 0) {
+      frame->free = true;
     }
-    
-    frame->free = true;
 
     // Removing page form the list
     LIST_ITEM* p = current;
