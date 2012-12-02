@@ -517,6 +517,7 @@ PCB *pcb;
           if (p == current) {
             current = ahead;
           }
+	  break;
         }
         p = p->next;
       } while ( p != current );
